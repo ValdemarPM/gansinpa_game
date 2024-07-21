@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gran SinPa Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+
+        #game-container {
+            text-align: center;
+            max-width: 100%;
+            padding: 10px;
+        }
+
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-gap: 1px;
+            margin-bottom: 20px;
+            border: 4px solid #333;
+            max-width: 100%;
+        }
+
+        .cell {
+            aspect-ratio: 1 / 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 8px;
+        }
+
+        .empty {
+            background-color: #fff;
+        }
+
+        .shelf {
+            background-color: #8B4513;
+            color: #D2691E;
+        }
+
+        .pickup {
+            background-color: #DF0000;
+            color: white;
+            cursor: pointer;
+        }
+
+        .player {
+            background-color: #2196F3;
+            color: white;
+        }
+
+        .collected {
+            background-color: #654321;
+            color: #D2691E;
+        }
+
+        #info {
+            margin-bottom: 20px;
+        }
+
+        #time {
+            font-weight: 600;
+            color: #DF0000;
+        }
+
+        #end-game {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        #buttons {
+            margin-top: 10px;
+
+        }
+
+        button {
+            margin: 0 5px;
+            padding: 20px;
+        }
+
+        #touch-controls {
+            display: none;
+            grid-template-columns: repeat(2, 0.5fr);
+            gap: 2px;
+            margin: 20px;
+        }
+
+        .touch-button {
+            padding: 10px;
+            font-size: 18px;
+            background-color: #000;
+            color: white;
+            border: none;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            #touch-controls {
+                display: grid;
+            }
+
+            h1 {
+                font-size: 1.5em;
+            }
+
+            #info {
+                font-size: 0.9em;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="game-container">
+        <h1>Improved Appliance Store Shopping Game</h1>
+        <div id="info">
+            <p>Score: €<span id="score">0</span> | Items: <span id="cart">0</span>/<span id="total-items">30</span></p>
+            <p>Time: <span id="time">60</span> seconds</p>
+
+        </div>
+        <div id="touch-controls">
+            <button class="touch-button" id="left-btn">←</button>
+            <button class="touch-button" id="up-btn">↑</button>
+            <button class="touch-button" id="right-btn">→</button>
+            <button class="touch-button" id="down-btn">↓</button>
+        </div>
+        <div id="game-board"></div>
+        <div id="buttons">
+            <button id="start-btn">Start Game</button>
+            <button id="restart-btn" style="display: none;">Restart Game</button>
+        </div>
+
+    </div>
+    <div id="end-game"></div>
+
+    <script>
+        const gameBoard = document.getElementById('game-board');
+        const timeSpan = document.getElementById('time');
+        const scoreSpan = document.getElementById('score');
+        const cartSpan = document.getElementById('cart');
+        const totalItemsSpan = document.getElementById('total-items');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const endGameDiv = document.getElementById('end-game');
+
+        const boardWidth = 10;
+        const boardHeight = 16;
+        let playerPosition = { x: 0, y: 0 };
+        let pickupItems = [];
+        let score = 0;
+        let timeLeft = 60;
+        let gameInterval;
+        let cartItems = 0;
+        const totalItems = 30;
+        const initialTime = timeLeft;
+
+        const storeLayout = [
+            "##########",
+            "#P  # #  #",
+            "# # # #  #",
+            "# # #  # #",
+            "# # #    #",
+            "# # # ## #",
+            "#   #  # #",
+            "# #  # # #",
+            "# #  #   #",
+            "# # ## # #",
+            "# #  # # #",
+            "# #    # #",
+            "#   #    #",
+            "# # ## # #",
+            "# #    # #",
+            "##########"
+        ];
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function createBoard() {
+            gameBoard.innerHTML = '';
+            pickupItems = [];
+
+            // Create a list of all possible shelf positions
+            let shelfPositions = [];
+            for (let y = 0; y < boardHeight; y++) {
+                for (let x = 0; x < boardWidth; x++) {
+                    if (storeLayout[y][x] === '#' && isAdjacentToWhiteSpace(x, y)) {
+                        shelfPositions.push({ x, y });
+                    }
+                }
+            }
+
+            // Shuffle the shelf positions
+            shuffleArray(shelfPositions);
+
+            // Select the first 30 positions for items, or fewer if not enough valid positions
+            let itemPositions = shelfPositions.slice(0, Math.min(totalItems, shelfPositions.length));
+
+            for (let y = 0; y < boardHeight; y++) {
+                for (let x = 0; x < boardWidth; x++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.x = x;
+                    cell.dataset.y = y;
+
+                    if (storeLayout[y][x] === '#') {
+                        const isItem = itemPositions.some(pos => pos.x === x && pos.y === y);
+                        if (isItem) {
+                            const price = Math.floor(Math.random() * 100) + 50;
+                            cell.classList.add('pickup');
+                            cell.textContent = '€' + price;
+                            pickupItems.push({ x, y, price });
+                        } else {
+                            cell.classList.add('shelf');
+                            cell.textContent = '📦';
+                        }
+                    } else if (storeLayout[y][x] === 'P') {
+                        cell.classList.add('empty');
+                        playerPosition = { x, y };
+                    } else {
+                        cell.classList.add('empty');
+                    }
+                    gameBoard.appendChild(cell);
+                }
+            }
+            placePlayer();
+
+            // Update total items count
+            totalItemsSpan.textContent = pickupItems.length;
+        }
+
+        function placePlayer() {
+            const cell = gameBoard.querySelector(`[data-x="${playerPosition.x}"][data-y="${playerPosition.y}"]`);
+            cell.classList.add('player');
+            cell.textContent = '🛒';
+        }
+
+        function movePlayer(dx, dy) {
+            const newX = playerPosition.x + dx;
+            const newY = playerPosition.y + dy;
+
+            if (newX >= 0 && newX < boardWidth && newY >= 0 && newY < boardHeight) {
+                const newCell = gameBoard.querySelector(`[data-x="${newX}"][data-y="${newY}"]`);
+                if (!newCell.classList.contains('shelf') && !newCell.classList.contains('collected')) {
+                    const oldCell = gameBoard.querySelector(`[data-x="${playerPosition.x}"][data-y="${playerPosition.y}"]`);
+                    oldCell.classList.remove('player');
+                    if (oldCell.classList.contains('pickup')) {
+                        const item = pickupItems.find(p => p.x === playerPosition.x && p.y === playerPosition.y);
+                        oldCell.textContent = '€' + item.price;
+                    } else {
+                        oldCell.textContent = '';
+                    }
+
+                    playerPosition.x = newX;
+                    playerPosition.y = newY;
+
+                    newCell.classList.add('player');
+                    newCell.textContent = '🛒';
+
+                    checkPickup();
+                }
+            }
+        }
+
+        function checkPickup() {
+            const itemIndex = pickupItems.findIndex(p => p.x === playerPosition.x && p.y === playerPosition.y);
+            if (itemIndex !== -1) {
+                const item = pickupItems[itemIndex];
+                score += item.price;
+                cartItems++;
+                scoreSpan.textContent = score;
+                cartSpan.textContent = cartItems;
+                pickupItems.splice(itemIndex, 1);
+
+                const cell = gameBoard.querySelector(`[data-x="${playerPosition.x}"][data-y="${playerPosition.y}"]`);
+                cell.classList.remove('pickup');
+                cell.classList.add('collected');
+                cell.textContent = '🚫';
+
+                if (cartItems === totalItems) {
+                    endGame(true);
+                }
+            }
+        }
+
+        function updateTime() {
+            timeLeft--;
+            timeSpan.textContent = timeLeft;
+            if (timeLeft <= 0) {
+                endGame(false);
+            }
+        }
+
+        function endGame(isWin) {
+            clearInterval(gameInterval);
+            timeSpent = initialTime - timeLeft;
+            endGameDiv.style.display = 'block';
+            if (isWin) {
+                endGameDiv.innerHTML = `<h2>Congratulations! You won!</h2>
+                    <p>You've collected all ${totalItems} items in ${timeSpent} seconds!</p>
+                    <p>Your final score is €${score}</p>
+                    <button onclick="resetGame()">Play Again</button>`;
+            } else {
+                endGameDiv.innerHTML = `<h2>Game Over!</h2>
+                    <p>You collected ${cartItems} out of ${totalItems} items.</p>
+                    <p>Your final score is €${score}</p>
+                    <button onclick="resetGame()">Try Again</button>`;
+            }
+        }
+
+        function resetGame() {
+            endGameDiv.style.display = 'none';
+            startGame();
+        }
+
+        function isAdjacentToWhiteSpace(x, y) {
+            const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+            for (let [dx, dy] of directions) {
+                const newX = x + dx;
+                const newY = y + dy;
+                if (newX >= 0 && newX < boardWidth && newY >= 0 && newY < boardHeight) {
+                    if (storeLayout[newY][newX] === ' ') {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function handleTouchMove(direction) {
+            switch (direction) {
+                case 'up':
+                    movePlayer(0, -1);
+                    break;
+                case 'down':
+                    movePlayer(0, 1);
+                    break;
+                case 'left':
+                    movePlayer(-1, 0);
+                    break;
+                case 'right':
+                    movePlayer(1, 0);
+                    break;
+            }
+        }
+
+        function startGame() {
+            createBoard();
+            score = 0;
+            cartItems = 0;
+            timeLeft = 60;
+            scoreSpan.textContent = score;
+            cartSpan.textContent = cartItems;
+            timeSpan.textContent = timeLeft;
+            startBtn.style.display = 'none';
+            restartBtn.style.display = 'inline-block';
+
+            gameInterval = setInterval(updateTime, 1000);
+
+            document.addEventListener('keydown', handleKeyPress);
+
+            // Add touch event listeners
+            document.getElementById('up-btn').addEventListener('click', () => handleTouchMove('up'));
+            document.getElementById('down-btn').addEventListener('click', () => handleTouchMove('down'));
+            document.getElementById('left-btn').addEventListener('click', () => handleTouchMove('left'));
+            document.getElementById('right-btn').addEventListener('click', () => handleTouchMove('right'));
+        }
+
+        function handleKeyPress(event) {
+            switch (event.key) {
+                case 'ArrowUp':
+                    movePlayer(0, -1);
+                    break;
+                case 'ArrowDown':
+                    movePlayer(0, 1);
+                    break;
+                case 'ArrowLeft':
+                    movePlayer(-1, 0);
+                    break;
+                case 'ArrowRight':
+                    movePlayer(1, 0);
+                    break;
+            }
+        }
+
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', resetGame);
+    </script>
+</body>
+
+</html>
