@@ -37,7 +37,7 @@
             justify-content: center;
             align-items: center;
             font-weight: bold;
-            font-size: 12px;
+            font-size: 14px;
         }
 
         .empty {
@@ -56,7 +56,7 @@
         }
 
         .player {
-            background-color: #ffEE00;
+            background-color: #2196F3;
             color: white;
         }
 
@@ -161,19 +161,19 @@
         const startBtn = document.getElementById('start-btn');
         const restartBtn = document.getElementById('restart-btn');
         const endGameDiv = document.getElementById('end-game');
+        const touchControls = document.getElementById('touch-controls');
 
         const boardWidth = 10;
-        const boardHeight = 16;
         let playerPosition = { x: 0, y: 0 };
         let pickupItems = [];
         let score = 0;
         let timeLeft = 60;
         let gameInterval;
         let cartItems = 0;
-        const totalItems = 30;
+        let totalItems;
         const initialTime = timeLeft;
 
-        const storeLayout = [
+        const storeLayout_desktop = [
             "##########",
             "#P  # #  #",
             "# # # #  #",
@@ -192,6 +192,29 @@
             "##########"
         ];
 
+        const storeLayout_mobile = [
+            "##########",
+            "#P  # #  #",
+            "# # # #  #",
+            "# # #  # #",
+            "# #      #",
+            "# # # ## #",
+            "#   #  # #",
+            "# #  # # #",
+            "# #  #   #",
+            "##########"
+        ];
+
+        function isTouchDevice() {
+            return (('ontouchstart' in window) ||
+                (navigator.maxTouchPoints > 0) ||
+                (navigator.msMaxTouchPoints > 0));
+        }
+
+        // Check what layout to add
+        const storeLayout = isTouchDevice() ? storeLayout_mobile : storeLayout_desktop;
+        const boardHeight = isTouchDevice() ? 10 : 16;
+
         function shuffleArray(array) {
             for (let i = array.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
@@ -202,6 +225,9 @@
         function createBoard() {
             gameBoard.innerHTML = '';
             pickupItems = [];
+
+
+
 
             // Create a list of all possible shelf positions
             let shelfPositions = [];
@@ -350,6 +376,19 @@
             return false;
         }
 
+        function setTotalItems() {
+            totalItems = isTouchDevice() ? 20 : 30;
+            totalItemsSpan.textContent = totalItems;
+        }
+
+        function setControlsVisibility() {
+            if (isTouchDevice()) {
+                touchControls.style.display = 'grid';
+            } else {
+                touchControls.style.display = 'none';
+            }
+        }
+
         function handleTouchMove(direction) {
             switch (direction) {
                 case 'up':
@@ -367,7 +406,11 @@
             }
         }
 
+
+
         function startGame() {
+            setTotalItems();
+            setControlsVisibility();
             createBoard();
             score = 0;
             cartItems = 0;
@@ -382,11 +425,13 @@
 
             document.addEventListener('keydown', handleKeyPress);
 
-            // Add touch event listeners
-            document.getElementById('up-btn').addEventListener('click', () => handleTouchMove('up'));
-            document.getElementById('down-btn').addEventListener('click', () => handleTouchMove('down'));
-            document.getElementById('left-btn').addEventListener('click', () => handleTouchMove('left'));
-            document.getElementById('right-btn').addEventListener('click', () => handleTouchMove('right'));
+            // Add touch event listeners only for touch devices
+            if (isTouchDevice()) {
+                document.getElementById('up-btn').addEventListener('click', () => handleTouchMove('up'));
+                document.getElementById('down-btn').addEventListener('click', () => handleTouchMove('down'));
+                document.getElementById('left-btn').addEventListener('click', () => handleTouchMove('left'));
+                document.getElementById('right-btn').addEventListener('click', () => handleTouchMove('right'));
+            }
         }
 
         function handleKeyPress(event) {
