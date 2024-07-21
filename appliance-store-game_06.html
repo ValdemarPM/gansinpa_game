@@ -298,7 +298,7 @@
                 const cell = gameBoard.querySelector(`[data-x="${playerPosition.x}"][data-y="${playerPosition.y}"]`);
                 cell.classList.remove('pickup');
                 cell.classList.add('collected');
-                cell.textContent = '🚫';
+                cell.textContent = '🌟';
 
                 if (cartItems === totalItems) {
                     endGame(true);
